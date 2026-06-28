@@ -7,14 +7,25 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configurar base de datos Postgres (Obtener connection string de variable de entorno)
 var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
-var dbPass = Environment.GetEnvironmentVariable("DB_PASS") ?? "postgres";
-var connectionString = $"Host={dbHost};Database=journaldb;Username=postgres;Password={dbPass}";
+var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "journal_db";
+var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "journal_user";
+var dbPass = Environment.GetEnvironmentVariable("DB_PASS") ?? "journal_pass";
+var connectionString = $"Host={dbHost};Database={dbName};Username={dbUser};Password={dbPass}";
 
 builder.Services.AddDbContext<JournalContext>(options =>
     options.UseNpgsql(connectionString));
 
 // Configurar AWS SQS
-builder.Services.AddAWSService<IAmazonSQS>();
+var awsEndpoint = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
+if (!string.IsNullOrEmpty(awsEndpoint))
+{
+    var sqsConfig = new AmazonSQSConfig { ServiceURL = awsEndpoint };
+    builder.Services.AddSingleton<IAmazonSQS>(new AmazonSQSClient(sqsConfig));
+}
+else
+{
+    builder.Services.AddAWSService<IAmazonSQS>();
+}
 
 var app = builder.Build();
 

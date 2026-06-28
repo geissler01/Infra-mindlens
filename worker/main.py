@@ -9,14 +9,17 @@ SQS_QUEUE_URL = os.getenv('SQS_QUEUE_URL', '')
 DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_PASS = os.getenv('DB_PASS', 'postgres')
 
+DB_USER = os.getenv('DB_USER', 'journal_user')
+DB_NAME = os.getenv('DB_NAME', 'journal_db')
+
 # Inicializar clientes
 sqs = boto3.client('sqs', region_name='us-east-1')
 
 def get_db_connection():
     return psycopg2.connect(
         host=DB_HOST,
-        database="journaldb",
-        user="postgres",
+        database=DB_NAME,
+        user=DB_USER,
         password=DB_PASS
     )
 

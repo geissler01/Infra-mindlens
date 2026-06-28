@@ -21,7 +21,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-journal_pass}
       POSTGRES_DB: ${POSTGRES_DB:-journal_db}
     ports:
-      - "5475:5432"
+      - "54320:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -29,10 +29,9 @@ services:
       - journal-net
 
   localstack:
-    image: localstack/localstack:latest
+    image: localstack/localstack:3.5.0
     container_name: localstack
     environment:
-      - SERVICES=s3,sqs
       - DEBUG=1
       - DOCKER_HOST=unix:///var/run/docker.sock
       - AWS_DEFAULT_REGION=us-east-1
@@ -53,13 +52,17 @@ services:
       dockerfile: Dockerfile
     container_name: backend-dotnet
     environment:
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=${POSTGRES_DB:-journal_db};Username=${POSTGRES_USER:-journal_user};Password=${POSTGRES_PASSWORD:-journal_pass}
+      - DB_HOST=db
+      - DB_NAME=${POSTGRES_DB:-journal_db}
+      - DB_USER=${POSTGRES_USER:-journal_user}
+      - DB_PASS=${POSTGRES_PASSWORD:-journal_pass}
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-      - AWS_SERVICE_URL=http://localstack:4566
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - SQS_QUEUE_URL=http://localstack:4566/000000000000/journal-processing-queue
     ports:
-      - "5000:80" # ASP.NET Core normalmente expone el 80 en los contenedores
+      - "5000:8080" # El Dockerfile está configurado para exponer el 8080
     depends_on:
       - db
       - localstack
@@ -81,6 +84,7 @@ services:
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_ENDPOINT_URL=http://localstack:4566
+      - SQS_QUEUE_URL=http://localstack:4566/000000000000/journal-processing-queue
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - db
