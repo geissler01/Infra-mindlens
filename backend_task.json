@@ -1,0 +1,30 @@
+{
+  "family": "poc-backend-task",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "016963912697.dkr.ecr.us-east-2.amazonaws.com/poc-backend:latest",
+      "essential": true,
+      "portMappings": [{"containerPort": 8080, "hostPort": 8080, "protocol": "tcp"}],
+      "environment": [
+        {"name": "DB_HOST", "value": "journal-db-poc.cxeacy8aglmv.us-east-2.rds.amazonaws.com"},
+        {"name": "DB_PASS", "value": "postgres"},
+        {"name": "SQS_QUEUE_URL", "value": "https://sqs.us-east-2.amazonaws.com/016963912697/journal-queue"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+            "awslogs-group": "/ecs/poc-backend",
+            "awslogs-region": "us-east-2",
+            "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::016963912697:role/ecsTaskExecutionRolePoc",
+  "taskRoleArn": "arn:aws:iam::016963912697:role/ecsTaskExecutionRolePoc"
+}

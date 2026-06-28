@@ -1,7 +1,12 @@
-# Placeholder Dockerfile (Reemplazar con código Python real)
 FROM python:3.11-slim
 WORKDIR /app
 
-# Esto es temporal para que docker-compose up no falle.
-# El equipo de Python debe borrar esto y usar su Dockerfile oficial.
-CMD ["sh", "-c", "echo 'Worker Python Placeholder. Reemplaza este Dockerfile con tu código.' && tail -f /dev/null"]
+# Instalar dependencias del sistema necesarias para compilar psycopg2
+RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY main.py .
+
+CMD ["python", "-u", "main.py"]

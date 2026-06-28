@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "dgSpecHash": "YiihrsULtok=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\ASUS\\Desktop\\RIWI\\ruta-avanzada\\ip\\infra-docker-prueba\\backend\\backend.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\ASUS\\.nuget\\packages\\awssdk.core\\4.0.9.7\\awssdk.core.4.0.9.7.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\awssdk.extensions.netcore.setup\\4.0.4.11\\awssdk.extensions.netcore.setup.4.0.4.11.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\awssdk.sqs\\4.0.3.8\\awssdk.sqs.4.0.3.8.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.7\\microsoft.aspnetcore.openapi.10.0.7.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.entityframeworkcore\\10.0.4\\microsoft.entityframeworkcore.10.0.4.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.entityframeworkcore.abstractions\\10.0.4\\microsoft.entityframeworkcore.abstractions.10.0.4.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.entityframeworkcore.analyzers\\10.0.4\\microsoft.entityframeworkcore.analyzers.10.0.4.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.entityframeworkcore.relational\\10.0.4\\microsoft.entityframeworkcore.relational.10.0.4.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\npgsql\\10.0.3\\npgsql.10.0.3.nupkg.sha512",
+    "C:\\Users\\ASUS\\.nuget\\packages\\npgsql.entityframeworkcore.postgresql\\10.0.2\\npgsql.entityframeworkcore.postgresql.10.0.2.nupkg.sha512"
+  ],
+  "logs": []
+}

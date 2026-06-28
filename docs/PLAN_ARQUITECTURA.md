@@ -1,8 +1,7 @@
-* [ ] 
+* [ ] erdock
 
 # Arquitectura y Diseño Detallado para Journal Psicológico
 
-Este documento reúne el diseño final y los detalles técnicos para preparar al equipo antes del desarrollo. Contiene el flujo lógico súper detallado, cómo se estructura físicamente en Docker (local), cómo será en AWS, aclaraciones técnicas clave y una guía de librerías para cada servicio.
 
 ---
 
@@ -110,27 +109,27 @@ graph TD
                 ALB["Application Load Balancer
                 (Reemplaza a NPM)"]
             end
-          
+        
             subgraph "Subred Privada (Protegida)"
                 ECS_API["Backend .NET (ECS Fargate)"]
                 ECS_Worker["Worker Python (ECS Fargate)"]
             end
-          
+        
             subgraph "Subred Aislada (Segura)"
                 RDS[("Amazon RDS PostgreSQL")]
             end
         end
-      
+    
         S3[("Amazon S3")]
         SQS[["Amazon SQS"]]
         IA(("APIs OpenAI"))
-      
+    
         AppProd((App Móvil)) --> ALB
         ALB -->|Tráfico API| ECS_API
         ECS_API --> RDS
         ECS_API --> SQS
         ECS_API --> S3
-      
+    
         SQS --> ECS_Worker
         ECS_Worker --> S3
         ECS_Worker --> RDS
