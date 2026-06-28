@@ -1,0 +1,25 @@
+# Entornos
+.env
+.env.*
+!.env.example
+
+# C# / .NET
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env/
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
