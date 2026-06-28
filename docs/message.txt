@@ -1,0 +1,133 @@
+-- Activar la extensión pgvector (Ejecutar como superusuario)
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- 1. Tabla: Patients
+CREATE TABLE patients (
+    id SERIAL PRIMARY KEY,
+    global_user_id VARCHAR(255) NOT NULL UNIQUE,
+    phone VARCHAR(50),
+    emergency_phone VARCHAR(50),
+    address TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Tabla: Treatments
+CREATE TABLE treatments (
+    id SERIAL PRIMARY KEY,
+    patient_id INTEGER NOT NULL,
+    started_at TIMESTAMP NOT NULL,
+    finished_at TIMESTAMP,
+    session_day VARCHAR(50),
+    state VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    CONSTRAINT fk_treatments_patients 
+        FOREIGN KEY (patient_id) REFERENCES patients(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 3. Tabla: Journalings
+CREATE TABLE journalings (
+    id SERIAL PRIMARY KEY,
+    treatment_id INTEGER NOT NULL,
+    date DATE NOT NULL,
+    transcription TEXT,
+    voice_record_url VARCHAR(2083),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_journalings_treatments 
+        FOREIGN KEY (treatment_id) REFERENCES treatments(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 4. Tabla: Questions
+CREATE TABLE questions (
+    id SERIAL PRIMARY KEY,
+    question TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. Tabla: TreatmentsQuestion (Tabla intermedia / Muchos a Muchos)
+CREATE TABLE treatments_questions (
+    id SERIAL PRIMARY KEY,
+    treatment_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    CONSTRAINT fk_tq_treatments 
+        FOREIGN KEY (treatment_id) REFERENCES treatments(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_tq_questions 
+        FOREIGN KEY (question_id) REFERENCES questions(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 6. Tabla: JournalingAnswers
+CREATE TABLE journaling_answers (
+    id SERIAL PRIMARY KEY,
+    journaling_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    voice_record_url VARCHAR(2083),
+    transcription TEXT,
+    CONSTRAINT fk_answers_journalings 
+        FOREIGN KEY (journaling_id) REFERENCES journalings(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_answers_questions 
+        FOREIGN KEY (question_id) REFERENCES questions(id) 
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- 7. Tabla: JournalingRegister (AI daily extractions)
+CREATE TABLE journaling_register (
+    id SERIAL PRIMARY KEY,
+    journaling_id INTEGER NOT NULL,
+    type VARCHAR(50) NOT NULL, -- Thought, Emotion, Habit, Belief
+    analyzed_content TEXT NOT NULL,
+    embedding vector(1536) NOT NULL, -- Tipo de dato nativo de pgvector
+    CONSTRAINT fk_register_journalings 
+        FOREIGN KEY (journaling_id) REFERENCES journalings(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 8. Tabla: WeeklyReports
+CREATE TABLE weekly_reports (
+    id SERIAL PRIMARY KEY,
+    treatment_id INTEGER NOT NULL,
+    summary TEXT NOT NULL,
+    started_at DATE NOT NULL,
+    finished_at DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_weekly_treatments 
+        FOREIGN KEY (treatment_id) REFERENCES treatments(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 9. Tabla: WeeklyClusterReports
+CREATE TABLE weekly_cluster_reports (
+    id SERIAL PRIMARY KEY,
+    weekly_report_id INTEGER NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL, -- Thought, Emotion, Habit, Belief
+    repetitions INTEGER NOT NULL DEFAULT 1,
+    cluster_embedding vector(1536) NOT NULL, -- Tipo de dato nativo de pgvector
+    CONSTRAINT fk_clusters_weekly 
+        FOREIGN KEY (weekly_report_id) REFERENCES weekly_reports(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 10. Tabla: Notes
+CREATE TABLE notes (
+    id SERIAL PRIMARY KEY,
+    treatment_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_notes_treatments 
+        FOREIGN KEY (treatment_id) REFERENCES treatments(id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- --- ÍNDICES TRADICIONALES DE OPTIMIZACIÓN ---
+CREATE INDEX idx_journalings_treatment_date ON journalings(treatment_id, date);
+CREATE INDEX idx_register_journaling ON journaling_register(journaling_id);
+
+-- --- ÍNDICES VECTORIALES HNSW (Para búsquedas rápidas con pgvector) ---
+CREATE INDEX idx_register_embedding_hnsw ON journaling_register USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX idx_cluster_embedding_hnsw ON weekly_cluster_reports USING hnsw (cluster_embedding vector_cosine_ops);

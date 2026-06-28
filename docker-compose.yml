@@ -14,7 +14,7 @@ services:
       - journal-net
 
   db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: postgres-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-journal_user}
@@ -24,7 +24,7 @@ services:
       - "54320:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - journal-net
 
@@ -61,8 +61,6 @@ services:
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_ENDPOINT_URL=http://localstack:4566
       - SQS_QUEUE_URL=http://localstack:4566/000000000000/journal-processing-queue
-    ports:
-      - "5000:8080" # El Dockerfile está configurado para exponer el 8080
     depends_on:
       - db
       - localstack

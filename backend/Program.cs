@@ -1,102 +1,139 @@
-using Amazon.SQS;
-using Amazon.SQS.Model;
+using Backend.Services;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
+using System.ComponentModel.DataAnnotations.Schema;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurar base de datos Postgres (Obtener connection string de variable de entorno)
+// Configurar base de datos Postgres
 var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
 var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "journal_db";
 var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "journal_user";
 var dbPass = Environment.GetEnvironmentVariable("DB_PASS") ?? "journal_pass";
 var connectionString = $"Host={dbHost};Database={dbName};Username={dbUser};Password={dbPass}";
 
-builder.Services.AddDbContext<JournalContext>(options =>
-    options.UseNpgsql(connectionString));
+builder.Services.AddDbContext<JournalContext>(options => options.UseNpgsql(connectionString));
 
-// Configurar AWS SQS
+// Configurar AWS SQS y S3
 var awsEndpoint = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
 if (!string.IsNullOrEmpty(awsEndpoint))
 {
-    var sqsConfig = new AmazonSQSConfig { ServiceURL = awsEndpoint };
-    builder.Services.AddSingleton<IAmazonSQS>(new AmazonSQSClient(sqsConfig));
+    var sqsConfig = new Amazon.SQS.AmazonSQSConfig { ServiceURL = awsEndpoint };
+    builder.Services.AddSingleton<Amazon.SQS.IAmazonSQS>(new Amazon.SQS.AmazonSQSClient(sqsConfig));
+    
+    var s3Config = new Amazon.S3.AmazonS3Config { ServiceURL = awsEndpoint, ForcePathStyle = true };
+    builder.Services.AddSingleton<Amazon.S3.IAmazonS3>(new Amazon.S3.AmazonS3Client(s3Config));
 }
 else
 {
-    builder.Services.AddAWSService<IAmazonSQS>();
+    builder.Services.AddAWSService<Amazon.SQS.IAmazonSQS>();
+    builder.Services.AddAWSService<Amazon.S3.IAmazonS3>();
 }
+
+builder.Services.AddSingleton<AwsHelper>();
 
 var app = builder.Build();
 
-// Crear la base de datos automáticamente al inicio para simplificar la PoC
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<JournalContext>();
-    db.Database.EnsureCreated();
-}
-
 app.MapGet("/api/status", () => Results.Ok(new { Status = "Backend is running!" }));
 
-app.MapPost("/journal/entry", async (JournalRequest request, JournalContext db, IAmazonSQS sqs) =>
+// 1. Obtener URL para subir el audio
+app.MapGet("/api/journal/upload-url", (AwsHelper awsHelper) =>
 {
-    // 1. Guardar en Base de Datos
-    var entry = new JournalEntry
+    var result = awsHelper.GenerateUploadPresignedUrl("treatment_1");
+    return Results.Content(result, "application/json");
+});
+
+// 2. Avisar al Backend que el audio ya se subió y encolar tarea
+app.MapPost("/api/journal/entry", async (JournalRequest request, JournalContext db, AwsHelper awsHelper) =>
+{
+    var entry = new Journaling
     {
-        PacienteId = request.PacienteId,
-        Texto = request.Texto,
+        TreatmentId = request.TreatmentId,
+        Date = DateOnly.FromDateTime(DateTime.UtcNow),
+        VoiceRecordKey = request.S3Key,
         Status = "processing"
     };
-    db.JournalEntries.Add(entry);
+    
+    db.Journalings.Add(entry);
     await db.SaveChangesAsync();
 
-    // 2. Enviar a SQS
-    var queueUrl = Environment.GetEnvironmentVariable("SQS_QUEUE_URL");
-    if (!string.IsNullOrEmpty(queueUrl))
+    // Enviar a SQS
+    await awsHelper.SendProcessingMessageAsync(entry.Id, request.S3Key);
+
+    return Results.Accepted($"/api/journal/entry/{entry.Id}", new { entryId = entry.Id });
+});
+
+// 3. Polling para ver si la IA terminó
+app.MapGet("/api/journal/entry/{id}", async (int id, JournalContext db, AwsHelper awsHelper) =>
+{
+    var entry = await db.Journalings.FindAsync(id);
+    if (entry == null) return Results.NotFound();
+    
+    if (entry.Status == "completed")
     {
-        var messageBody = JsonSerializer.Serialize(new { EntryId = entry.Id, Texto = entry.Texto });
-        await sqs.SendMessageAsync(new SendMessageRequest
+        // Simulación de correo en caso de emergencia
+        if (entry.IsEmergency == true)
         {
-            QueueUrl = queueUrl,
-            MessageBody = messageBody
+            Console.WriteLine($"[ALERTA DE EMERGENCIA] ⚠️ Enviando SMS/Correo al psicólogo del tratamiento {entry.TreatmentId} por el Journal {entry.Id}");
+        }
+
+        var downloadUrl = string.IsNullOrEmpty(entry.AiReplyKey) 
+            ? null 
+            : awsHelper.GenerateDownloadPresignedUrl(entry.AiReplyKey);
+
+        return Results.Ok(new { 
+            id = entry.Id, 
+            status = entry.Status, 
+            ai_reply_url = downloadUrl,
+            ai_reply_text = entry.AiReplyText,
+            is_emergency = entry.IsEmergency
         });
     }
 
-    return Results.Accepted($"/journal/entry/{entry.Id}", new { entryId = entry.Id });
-});
-
-app.MapGet("/journal/entry/{id}", async (int id, JournalContext db) =>
-{
-    var entry = await db.JournalEntries.FindAsync(id);
-    if (entry == null) return Results.NotFound();
-    
-    return Results.Ok(new { 
-        id = entry.Id, 
-        status = entry.Status, 
-        respuesta = entry.Respuesta 
-    });
+    return Results.Ok(new { id = entry.Id, status = entry.Status });
 });
 
 app.Run();
 
-// Modelos
+// --- Modelos ---
 public class JournalRequest
 {
-    public int PacienteId { get; set; }
-    public string Texto { get; set; } = string.Empty;
+    public int TreatmentId { get; set; }
+    public string S3Key { get; set; } = string.Empty;
 }
 
-public class JournalEntry
+[Table("journalings")]
+public class Journaling
 {
+    [Column("id")]
     public int Id { get; set; }
-    public int PacienteId { get; set; }
-    public string Texto { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-    public string? Respuesta { get; set; }
+    
+    [Column("treatment_id")]
+    public int TreatmentId { get; set; }
+    
+    [Column("date")]
+    public DateOnly Date { get; set; }
+    
+    [Column("status")]
+    public string Status { get; set; } = "processing";
+    
+    [Column("voice_record_key")]
+    public string? VoiceRecordKey { get; set; }
+    
+    [Column("ai_reply_key")]
+    public string? AiReplyKey { get; set; }
+
+    [Column("ai_reply_text")]
+    public string? AiReplyText { get; set; }
+    
+    [Column("is_emergency")]
+    public bool? IsEmergency { get; set; }
+    
+    [Column("transcription")]
+    public string? Transcription { get; set; }
 }
 
 public class JournalContext : DbContext
 {
     public JournalContext(DbContextOptions<JournalContext> options) : base(options) { }
-    public DbSet<JournalEntry> JournalEntries { get; set; }
+    public DbSet<Journaling> Journalings { get; set; }
 }
