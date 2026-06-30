@@ -1,19 +1,39 @@
-using Backend.Services;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.IdentityModel.Tokens;
+using MindLens.Api.Configuration;
+using MindLens.Api.Models;
+using MindLens.Api.Data;
+using MindLens.Api.Middlewares;
+using MindLens.Api.Services;
+using MindLens.Api.Services.Interfaces;
+using MindLens.Api.Data.Seeders;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurar base de datos Postgres
-var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
-var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "journal_db";
-var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "journal_user";
-var dbPass = Environment.GetEnvironmentVariable("DB_PASS") ?? "journal_pass";
-var connectionString = $"Host={dbHost};Database={dbName};Username={dbUser};Password={dbPass}";
+// Add services to the container.
+// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddOpenApi();
 
-builder.Services.AddDbContext<JournalContext>(options => options.UseNpgsql(connectionString));
+// Configuration Setup
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+builder.Services.AddSwaggerConfiguration();
 
-// Configurar AWS SQS y S3
+// Services Setup
+builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddScoped<ITenantService, TenantService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<ITreatmentService, TreatmentService>();
+builder.Services.AddScoped<IJournalingService, JournalingService>();
+
+// AWS Services Setup
 var awsEndpoint = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");
 if (!string.IsNullOrEmpty(awsEndpoint))
 {
@@ -28,112 +48,120 @@ else
     builder.Services.AddAWSService<Amazon.SQS.IAmazonSQS>();
     builder.Services.AddAWSService<Amazon.S3.IAmazonS3>();
 }
+builder.Services.AddSingleton<IAwsHelper, AwsHelper>();
 
-builder.Services.AddSingleton<AwsHelper>();
+// DB Context Setup
+builder.Services.AddDbContext<ApplicationContext>(options =>
+{
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("SharedDB")
+    );
+});
+
+// Tenant DB Context Setup
+builder.Services.AddDbContext<TenantContext>((sp, options) =>
+{
+    var tenantService = sp.GetRequiredService<ITenantService>();
+    var configuration = sp.GetRequiredService<IConfiguration>();
+
+    var builder = new NpgsqlConnectionStringBuilder(configuration.GetConnectionString("SharedDb"));
+    builder.Database = tenantService.CurrentTenant?.DatabaseName ?? "Setup";
+    
+    options.UseNpgsql(builder.ConnectionString, o => 
+    {
+        o.UseVector(); // Registering vector extension
+    });
+});
+
+// Identity Setup
+builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>
+{
+    // Identity User Properties Configuration
+    options.Password.RequireDigit = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequiredLength = 8;
+    
+    options.User.RequireUniqueEmail = true;
+})
+.AddEntityFrameworkStores<ApplicationContext>()
+.AddDefaultTokenProviders();
+
+// JWT Setup
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options => 
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+            ),
+        
+        RoleClaimType = ClaimTypes.Role
+    };
+    
+    // Debugging
+    options.Events = new JwtBearerEvents 
+    {
+        OnMessageReceived = context => 
+        {
+            Console.WriteLine($"Authorization: {context.Request.Headers.Authorization}");
+            return Task.CompletedTask;
+        },
+        
+        OnTokenValidated = context =>
+        {
+            Console.WriteLine("VALID TOKEN");
+            return Task.CompletedTask;
+        },
+        
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine(context.Exception.ToString());
+            return Task.CompletedTask;
+        }
+    };
+});
+builder.Services.AddAuthorization();
+
+// Controllers Setup
+builder.Services.AddControllers().AddJsonOptions(options => 
+{
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 var app = builder.Build();
 
-app.MapGet("/api/status", () => Results.Ok(new { Status = "Backend is running!" }));
-
-// 1. Obtener URL para subir el audio
-app.MapGet("/api/journal/upload-url", (AwsHelper awsHelper) =>
+// Seeders
+using (var scope = app.Services.CreateScope())
 {
-    var result = awsHelper.GenerateUploadPresignedUrl("treatment_1");
-    return Results.Content(result, "application/json");
-});
+    await RoleSeeder.SeedAsync(scope.ServiceProvider);
+    await MasterDataSeeder.SeedAsync(scope.ServiceProvider);
+}
 
-// 2. Avisar al Backend que el audio ya se subió y encolar tarea
-app.MapPost("/api/journal/entry", async (JournalRequest request, JournalContext db, AwsHelper awsHelper) =>
-{
-    var entry = new Journaling
-    {
-        TreatmentId = request.TreatmentId,
-        Date = DateOnly.FromDateTime(DateTime.UtcNow),
-        VoiceRecordKey = request.S3Key,
-        Status = "processing"
-    };
-    
-    db.Journalings.Add(entry);
-    await db.SaveChangesAsync();
+// Global Exception Middleware
+app.UseMiddleware<ExceptionMiddleware>();
 
-    // Enviar a SQS
-    await awsHelper.SendProcessingMessageAsync(entry.Id, request.S3Key);
+app.UseSwaggerConfiguration();
+app.UseHttpsRedirection();
+app.UseAuthentication();
 
-    return Results.Accepted($"/api/journal/entry/{entry.Id}", new { entryId = entry.Id });
-});
+// Tenant Authentication Middleware
+app.UseMiddleware<TenantMiddleware>();
 
-// 3. Polling para ver si la IA terminó
-app.MapGet("/api/journal/entry/{id}", async (int id, JournalContext db, AwsHelper awsHelper) =>
-{
-    var entry = await db.Journalings.FindAsync(id);
-    if (entry == null) return Results.NotFound();
-    
-    if (entry.Status == "completed")
-    {
-        // Simulación de correo en caso de emergencia
-        if (entry.IsEmergency == true)
-        {
-            Console.WriteLine($"[ALERTA DE EMERGENCIA] ⚠️ Enviando SMS/Correo al psicólogo del tratamiento {entry.TreatmentId} por el Journal {entry.Id}");
-        }
-
-        var downloadUrl = string.IsNullOrEmpty(entry.AiReplyKey) 
-            ? null 
-            : awsHelper.GenerateDownloadPresignedUrl(entry.AiReplyKey);
-
-        return Results.Ok(new { 
-            id = entry.Id, 
-            status = entry.Status, 
-            ai_reply_url = downloadUrl,
-            ai_reply_text = entry.AiReplyText,
-            is_emergency = entry.IsEmergency
-        });
-    }
-
-    return Results.Ok(new { id = entry.Id, status = entry.Status });
-});
+app.UseAuthorization();
+app.MapControllers();
 
 app.Run();
-
-// --- Modelos ---
-public class JournalRequest
-{
-    public int TreatmentId { get; set; }
-    public string S3Key { get; set; } = string.Empty;
-}
-
-[Table("journalings")]
-public class Journaling
-{
-    [Column("id")]
-    public int Id { get; set; }
-    
-    [Column("treatment_id")]
-    public int TreatmentId { get; set; }
-    
-    [Column("date")]
-    public DateOnly Date { get; set; }
-    
-    [Column("status")]
-    public string Status { get; set; } = "processing";
-    
-    [Column("voice_record_key")]
-    public string? VoiceRecordKey { get; set; }
-    
-    [Column("ai_reply_key")]
-    public string? AiReplyKey { get; set; }
-
-    [Column("ai_reply_text")]
-    public string? AiReplyText { get; set; }
-    
-    [Column("is_emergency")]
-    public bool? IsEmergency { get; set; }
-    
-    [Column("transcription")]
-    public string? Transcription { get; set; }
-}
-
-public class JournalContext : DbContext
-{
-    public JournalContext(DbContextOptions<JournalContext> options) : base(options) { }
-    public DbSet<Journaling> Journalings { get; set; }
-}

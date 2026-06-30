@@ -6,7 +6,7 @@ class Settings(BaseModel):
     AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
     AWS_ENDPOINT_URL: str = os.getenv("AWS_ENDPOINT_URL", "http://localstack:4566")
     SQS_QUEUE_URL: str = os.getenv("SQS_QUEUE_URL", "http://localstack:4566/000000000000/journal-processing-queue")
-    BUCKET_NAME: str = os.getenv("BUCKET_NAME", "journal-audios")
+    BUCKET_NAME: str = os.getenv("BUCKET_NAME", "journal-audios-bucket")
     
     # OpenAI
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")

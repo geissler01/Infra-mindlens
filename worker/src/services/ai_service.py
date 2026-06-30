@@ -30,13 +30,13 @@ def generate_advice(transcribed_text, patient_context, nota):
         return "Simulación: Respira profundo, todo saldrá bien.", False
 
     # Extraer valores seguros del diccionario de contexto (evitando PII)
-    edad = patient_context.get("age_range", "No especificada")
-    ocupacion = patient_context.get("occupation_type", "No especificada")
-    relacion = patient_context.get("relationship_status", "No especificada")
-    vivienda = patient_context.get("living_situation", "No especificada")
-    meta = patient_context.get("primary_goal", "Mejorar bienestar emocional")
-    terapia_previa = "Sí" if patient_context.get("has_previous_therapy") else "No"
-    estado = patient_context.get("state", "Desconocido")
+    edad = patient_context.get("AgeRange", "No especificada")
+    ocupacion = patient_context.get("Occupation", "No especificada")
+    relacion = patient_context.get("RelationshipStatus", "No especificada")
+    vivienda = patient_context.get("LivingSituation", "No especificada")
+    meta = patient_context.get("PrimaryGoal", "Mejorar bienestar emocional")
+    terapia_previa = "Sí" if patient_context.get("HasPreviousTherapy") else "No"
+    estado = patient_context.get("State", "Desconocido")
 
     system_prompt = f"""Eres un asistente de apoyo emocional de primera línea. El paciente acaba de grabar un diario de voz (o texto). Tu objetivo es brindarle un consejo breve, puntual y accionable (máximo 2 párrafos cortos). NO eres su psicólogo, eres una IA de apoyo entre sesiones.
 IMPORTANTE: Tu respuesta será convertida a audio y reproducida al paciente, así que debes hablar con un tono muy cálido, empático, conversacional y natural. Evita formatos raros, listas o enumeraciones.

@@ -10,13 +10,13 @@ from src.services.ai_service import transcribe_audio, generate_advice, generate_
 def process_message(message_body):
     print(f"Procesando mensaje: {message_body}")
     data = json.loads(message_body)
-    entry_id = data.get("EntryId")
+    entry_id = data.get("JournalingId") or data.get("EntryId") # Support both
     tenant_db = data.get("TenantDb")
     entry_type = data.get("EntryType", "audio")
     s3_key = data.get("S3Key")
     
     if not entry_id:
-        print("Mensaje inválido. Falta EntryId.")
+        print("Mensaje inválido. Falta JournalingId.")
         return
 
     transcribed_text = ""

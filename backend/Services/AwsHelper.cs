@@ -2,79 +2,79 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.SQS;
 using Amazon.SQS.Model;
+using MindLens.Api.Services.Interfaces;
 using System.Text.Json;
 
-namespace Backend.Services
+namespace MindLens.Api.Services;
+
+public class AwsHelper : IAwsHelper
 {
-    public class AwsHelper
+    private readonly IAmazonS3 _s3Client;
+    private readonly IAmazonSQS _sqsClient;
+    private readonly string _bucketName = "journal-audios-bucket";
+    private readonly string _queueUrl;
+    private readonly bool _isLocal;
+
+    public AwsHelper(IAmazonS3 s3Client, IAmazonSQS sqsClient)
     {
-        private readonly IAmazonS3 _s3Client;
-        private readonly IAmazonSQS _sqsClient;
-        private readonly string _bucketName = "journal-audios-bucket";
-        private readonly string _queueUrl;
-        private readonly bool _isLocal;
+        _s3Client = s3Client;
+        _sqsClient = sqsClient;
+        _queueUrl = Environment.GetEnvironmentVariable("SQS_QUEUE_URL") ?? "";
+        _isLocal = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL"));
+    }
 
-        public AwsHelper(IAmazonS3 s3Client, IAmazonSQS sqsClient)
+    public (string uploadUrl, string s3Key) GenerateUploadPresignedUrl(Guid tenantId, Guid patientId, Guid treatmentId)
+    {
+        var s3Key = $"audios/tenant_{tenantId}/patient_{patientId}/treatment_{treatmentId}/{Guid.NewGuid()}.m4a";
+        var request = new GetPreSignedUrlRequest
         {
-            _s3Client = s3Client;
-            _sqsClient = sqsClient;
-            _queueUrl = Environment.GetEnvironmentVariable("SQS_QUEUE_URL") ?? "";
-            _isLocal = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL"));
-        }
+            BucketName = _bucketName,
+            Key = s3Key,
+            Verb = HttpVerb.PUT,
+            Expires = DateTime.UtcNow.AddMinutes(15),
+            Protocol = _isLocal ? Protocol.HTTP : Protocol.HTTPS
+        };
 
-        public string GenerateUploadPresignedUrl(string patientId)
+        var url = _s3Client.GetPreSignedURL(request);
+        if (_isLocal && url.Contains("localstack")) 
         {
-            var s3Key = $"audios/{patientId}/{Guid.NewGuid()}.m4a";
-            var request = new GetPreSignedUrlRequest
-            {
-                BucketName = _bucketName,
-                Key = s3Key,
-                Verb = HttpVerb.PUT,
-                Expires = DateTime.UtcNow.AddMinutes(15),
-                Protocol = _isLocal ? Protocol.HTTP : Protocol.HTTPS
-            };
-
-            var url = _s3Client.GetPreSignedURL(request);
-            if (_isLocal && url.Contains("localstack")) 
-            {
-                url = url.Replace("localstack", "localhost");
-            }
-            
-            return JsonSerializer.Serialize(new { uploadUrl = url, s3Key = s3Key });
+            url = url.Replace("localstack", "localhost");
         }
+        
+        return (url, s3Key);
+    }
 
-        public string GenerateDownloadPresignedUrl(string s3Key)
+    public string GenerateDownloadPresignedUrl(string s3Key)
+    {
+        var request = new GetPreSignedUrlRequest
         {
-            var request = new GetPreSignedUrlRequest
-            {
-                BucketName = _bucketName,
-                Key = s3Key,
-                Verb = HttpVerb.GET,
-                Expires = DateTime.UtcNow.AddMinutes(60),
-                Protocol = _isLocal ? Protocol.HTTP : Protocol.HTTPS
-            };
+            BucketName = _bucketName,
+            Key = s3Key,
+            Verb = HttpVerb.GET,
+            Expires = DateTime.UtcNow.AddMinutes(15),
+            Protocol = _isLocal ? Protocol.HTTP : Protocol.HTTPS
+        };
 
-            var url = _s3Client.GetPreSignedURL(request);
-            if (_isLocal && url.Contains("localstack")) 
-            {
-                url = url.Replace("localstack", "localhost");
-            }
-            
-            return url;
-        }
-
-        public async Task SendProcessingMessageAsync(int journalingId, string s3Key)
+        var url = _s3Client.GetPreSignedURL(request);
+        if (_isLocal && url.Contains("localstack")) 
         {
-            if (string.IsNullOrEmpty(_queueUrl)) return;
-
-            var messageBody = JsonSerializer.Serialize(new { EntryId = journalingId, S3Key = s3Key });
-            var request = new SendMessageRequest
-            {
-                QueueUrl = _queueUrl,
-                MessageBody = messageBody
-            };
-
-            await _sqsClient.SendMessageAsync(request);
+            url = url.Replace("localstack", "localhost");
         }
+        
+        return url;
+    }
+
+    public async Task SendProcessingMessageAsync(Guid journalingId, string entryType, string s3Key)
+    {
+        if (string.IsNullOrEmpty(_queueUrl)) return;
+
+        var messageBody = JsonSerializer.Serialize(new { JournalingId = journalingId, EntryType = entryType, S3Key = s3Key });
+        var request = new SendMessageRequest
+        {
+            QueueUrl = _queueUrl,
+            MessageBody = messageBody
+        };
+
+        await _sqsClient.SendMessageAsync(request);
     }
 }
