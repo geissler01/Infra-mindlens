@@ -10,8 +10,21 @@ $vpcId = "vpc-0c319e153cc4ecfb5"
 $sgAlb = "sg-04b1dfe78c01df6c1"
 
 $albArn = (aws elbv2 create-load-balancer --name alb-poc --subnets $subPub1 $subPub2 --security-groups $sgAlb --query 'LoadBalancers[0].LoadBalancerArn' --output text)
-$tgArn = (aws elbv2 create-target-group --name tg-poc-backend --protocol HTTP --port 8080 --vpc-id $vpcId --target-type ip --health-check-path /api/status --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+Write-Output "Creando Target Group para Backend..."
+$tgArn = (aws elbv2 create-target-group --name tg-poc-backend --protocol HTTP --port 8080 --vpc-id $vpcId --target-type ip --health-check-path /api/journalings --query 'TargetGroups[0].TargetGroupArn' --output text)
 aws elbv2 create-listener --load-balancer-arn $albArn --protocol HTTP --port 80 --default-actions Type=forward,TargetGroupArn=$tgArn
+
+Write-Output "Creando Target Group para Adminer..."
+$tgAdminerArn = (aws elbv2 create-target-group --name tg-poc-adminer --protocol HTTP --port 8080 --vpc-id $vpcId --target-type ip --health-check-path / --query 'TargetGroups[0].TargetGroupArn' --output text)
+aws elbv2 create-listener --load-balancer-arn $albArn --protocol HTTP --port 8080 --default-actions Type=forward,TargetGroupArn=$tgAdminerArn
+
+Write-Output "Ajustando Security Groups para puerto 8080..."
+# Permitir trafico al ALB en el puerto 8080 (Adminer)
+aws ec2 authorize-security-group-ingress --group-id $sgAlb --protocol tcp --port 8080 --cidr 0.0.0.0/0
+# Permitir trafico a ECS desde ALB en el puerto 8080
+$sgEcs = "sg-043aada5e888dee01"
+aws ec2 authorize-security-group-ingress --group-id $sgEcs --protocol tcp --port 8080 --source-group $sgAlb
 
 Write-Output "3. Creando ECS Cluster..."
 aws ecs create-cluster --cluster-name journal-cluster

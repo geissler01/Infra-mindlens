@@ -8,9 +8,19 @@
       "essential": true,
       "portMappings": [{"containerPort": 8080, "hostPort": 8080, "protocol": "tcp"}],
       "environment": [
-        {"name": "DB_HOST", "value": "journal-db-poc.cxeacy8aglmv.us-east-2.rds.amazonaws.com"},
-        {"name": "DB_PASS", "value": "postgres"},
+        {"name": "MASTER_DB_HOST", "value": "journal-db-poc.cxeacy8aglmv.us-east-2.rds.amazonaws.com"},
+        {"name": "MASTER_DB_NAME", "value": "master_db"},
+        {"name": "MASTER_DB_USER", "value": "postgres"},
+        {"name": "TENANT_DB_HOST", "value": "journal-db-poc.cxeacy8aglmv.us-east-2.rds.amazonaws.com"},
+        {"name": "TENANT_DB_NAME", "value": "journal_db"},
+        {"name": "TENANT_DB_USER", "value": "postgres"},
+        {"name": "Jwt__Issuer", "value": "MindLens"},
+        {"name": "Jwt__Audience", "value": "MindLensUsers"},
         {"name": "SQS_QUEUE_URL", "value": "https://sqs.us-east-2.amazonaws.com/016963912697/journal-queue"}
+      ],
+      "secrets": [
+        {"name": "ConnectionStrings__SharedDB", "valueFrom": "arn:aws:ssm:us-east-2:016963912697:parameter/mindlens/prod/db_connection_string"},
+        {"name": "Jwt__Key", "valueFrom": "arn:aws:ssm:us-east-2:016963912697:parameter/mindlens/prod/jwt_key"}
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

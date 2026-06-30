@@ -1,0 +1,25 @@
+{
+  "family": "poc-adminer-task",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "adminer",
+      "image": "adminer",
+      "essential": true,
+      "portMappings": [{"containerPort": 8080, "hostPort": 8080, "protocol": "tcp"}],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+            "awslogs-group": "/ecs/poc-adminer",
+            "awslogs-region": "us-east-2",
+            "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::016963912697:role/ecsTaskExecutionRolePoc",
+  "taskRoleArn": "arn:aws:iam::016963912697:role/ecsTaskExecutionRolePoc"
+}
