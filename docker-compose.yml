@@ -13,6 +13,7 @@ services:
     networks:
       - journal-net
 
+  # Único servicio de Base de Datos (Múltiples DBs internamente)
   db:
     image: pgvector/pgvector:pg15
     container_name: postgres-db
@@ -24,7 +25,21 @@ services:
       - "54320:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./backend/database/init:/docker-entrypoint-initdb.d
+      - ./backend/database/schema:/docker-entrypoint-initdb.d/schema
+      - ./backend/database/seeds:/docker-entrypoint-initdb.d/seeds
+    networks:
+      - journal-net
+
+  # Visualizador de Bases de Datos
+  adminer:
+    image: adminer
+    container_name: adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
     networks:
       - journal-net
 
@@ -46,16 +61,19 @@ services:
       - journal-net
 
   backend:
-    # El equipo de .NET deberá reemplazar este Dockerfile por el suyo
     build: 
       context: ./backend
       dockerfile: Dockerfile
     container_name: backend-dotnet
     environment:
-      - DB_HOST=db
-      - DB_NAME=${POSTGRES_DB:-journal_db}
-      - DB_USER=${POSTGRES_USER:-journal_user}
-      - DB_PASS=${POSTGRES_PASSWORD:-journal_pass}
+      - MASTER_DB_HOST=db
+      - MASTER_DB_NAME=master_db
+      - MASTER_DB_USER=${POSTGRES_USER:-journal_user}
+      - MASTER_DB_PASS=${POSTGRES_PASSWORD:-journal_pass}
+      - TENANT_DB_HOST=db
+      - TENANT_DB_NAME=${POSTGRES_DB:-journal_db}
+      - TENANT_DB_USER=${POSTGRES_USER:-journal_user}
+      - TENANT_DB_PASS=${POSTGRES_PASSWORD:-journal_pass}
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
@@ -68,16 +86,19 @@ services:
       - journal-net
 
   worker:
-    # El equipo de Python deberá reemplazar este Dockerfile por el suyo
     build:
       context: ./worker
       dockerfile: Dockerfile
     container_name: worker-python
     environment:
-      - DB_HOST=db
-      - DB_NAME=${POSTGRES_DB:-journal_db}
-      - DB_USER=${POSTGRES_USER:-journal_user}
-      - DB_PASS=${POSTGRES_PASSWORD:-journal_pass}
+      - MASTER_DB_HOST=db
+      - MASTER_DB_NAME=master_db
+      - MASTER_DB_USER=${POSTGRES_USER:-journal_user}
+      - MASTER_DB_PASS=${POSTGRES_PASSWORD:-journal_pass}
+      - TENANT_DB_HOST=db
+      - TENANT_DB_NAME=${POSTGRES_DB:-journal_db}
+      - TENANT_DB_USER=${POSTGRES_USER:-journal_user}
+      - TENANT_DB_PASS=${POSTGRES_PASSWORD:-journal_pass}
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test

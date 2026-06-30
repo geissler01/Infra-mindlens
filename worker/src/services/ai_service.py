@@ -1,11 +1,10 @@
 import json
 from openai import OpenAI
-from config import OPENAI_API_KEY
-
-openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-
+from src.config.settings import settings
 import subprocess
 import os
+
+openai_client = OpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None
 
 def transcribe_audio(file_path):
     if not openai_client:
@@ -26,22 +25,36 @@ def transcribe_audio(file_path):
         if os.path.exists(normalized_path):
             os.remove(normalized_path)
 
-def generate_advice(transcribed_text, paciente, estado, nota):
+def generate_advice(transcribed_text, patient_context, nota):
     if not openai_client:
         return "Simulación: Respira profundo, todo saldrá bien.", False
 
-    system_prompt = f"""Eres un asistente de apoyo emocional de primera línea. El paciente acaba de grabar un diario de voz. Tu objetivo es brindarle un consejo breve, puntual y accionable (máximo 2 párrafos cortos). NO eres su psicólogo. 
-IMPORTANTE: Tu respuesta será convertida a audio y reproducida al paciente, así que debes hablar con un tono muy cálido, empático, conversacional y natural. Evita formatos raros o listas.
+    # Extraer valores seguros del diccionario de contexto (evitando PII)
+    edad = patient_context.get("age_range", "No especificada")
+    ocupacion = patient_context.get("occupation_type", "No especificada")
+    relacion = patient_context.get("relationship_status", "No especificada")
+    vivienda = patient_context.get("living_situation", "No especificada")
+    meta = patient_context.get("primary_goal", "Mejorar bienestar emocional")
+    terapia_previa = "Sí" if patient_context.get("has_previous_therapy") else "No"
+    estado = patient_context.get("state", "Desconocido")
 
-Contexto:
-- Paciente: {paciente}
-- Estado Tratamiento: {estado}
-- Nota del Psicólogo: {nota}
+    system_prompt = f"""Eres un asistente de apoyo emocional de primera línea. El paciente acaba de grabar un diario de voz (o texto). Tu objetivo es brindarle un consejo breve, puntual y accionable (máximo 2 párrafos cortos). NO eres su psicólogo, eres una IA de apoyo entre sesiones.
+IMPORTANTE: Tu respuesta será convertida a audio y reproducida al paciente, así que debes hablar con un tono muy cálido, empático, conversacional y natural. Evita formatos raros, listas o enumeraciones.
+
+Contexto Clínico del Paciente (Usa esto sutilmente para empatizar mejor):
+- Edad: {edad}
+- Ocupación: {ocupacion}
+- Estado Civil: {relacion}
+- Situación de Vivienda: {vivienda}
+- Terapia Previa: {terapia_previa}
+- Meta Principal del Tratamiento: {meta}
+- Estado del Tratamiento: {estado}
+- Nota reciente del Psicólogo: {nota}
 
 Debes responder ÚNICAMENTE con un JSON válido usando esta estructura:
 {{
   "consejo_texto": "Mensaje hablado para el paciente...",
-  "is_emergency": false (true si hay ideación suicida o crisis severa)
+  "is_emergency": false (true si hay ideación suicida, violencia inminente o crisis severa)
 }}
 """
     response = openai_client.chat.completions.create(
