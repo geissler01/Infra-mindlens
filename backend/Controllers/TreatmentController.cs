@@ -20,7 +20,7 @@ public class TreatmentController : ControllerBase
     {
         _treatmentService = treatmentService;
     }
-    
+
     [HttpGet]
     public async Task<ActionResult<ServiceResponse<ICollection<Treatment>>>> Get([FromQuery] TreatmentFilters filters)
     {
@@ -50,9 +50,10 @@ public class TreatmentController : ControllerBase
         // Returning response
         return StatusCode(response.StatusCode, response);
     }
-    
+
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<ServiceResponse>> Update(Guid id, TreatmentUpdateDto request) {
+    public async Task<ActionResult<ServiceResponse>> Update(Guid id, TreatmentUpdateDto request)
+    {
         // Passing it to service
         var response = await _treatmentService.Update(id, request);
 
@@ -65,6 +66,27 @@ public class TreatmentController : ControllerBase
     {
         // Passing it to Service
         var response = await _treatmentService.Finish(id);
+
+        // Returning response
+        return StatusCode(response.StatusCode, response);
+    }
+
+    // Treatment Questions
+    [HttpGet("{id:guid}/questions")]
+    public async Task<ActionResult<ServiceResponse<ICollection<TreatmentQuestion>>>> GetQuestions(Guid id)
+    {
+        // Passing it to service
+        var response = await _treatmentService.GetTreatmentQuestions(id);
+
+        // Returning response
+        return StatusCode(response.StatusCode, response);
+    }
+
+    [HttpGet("{id:guid}/questions/assign/{questionId:guid}")]
+    public async Task<ActionResult<ServiceResponse>> AssignQuestion(Guid id, Guid questionId)
+    {
+        // Passing it to service
+        var response = await  _treatmentService.AssignQuestion(id, questionId);
         
         // Returning response
         return StatusCode(response.StatusCode, response);

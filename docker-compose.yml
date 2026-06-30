@@ -75,7 +75,7 @@ services:
       - TENANT_DB_USER=${POSTGRES_USER:-journal_user}
       - TENANT_DB_PASS=${POSTGRES_PASSWORD:-journal_pass}
       - ConnectionStrings__SharedDB=Host=db;Port=5432;Database=master_db;Username=${POSTGRES_USER:-journal_user};Password=${POSTGRES_PASSWORD:-journal_pass}
-      - Jwt__Key=SuperSecretKey12345678901234567890
+      - Jwt__Key=u9B6vRXZWp8yKqM3tNfG2hJb4vCxD9zW1kLpQ6mF8sY=
       - Jwt__Issuer=MindLens
       - Jwt__Audience=MindLensUsers
       - AWS_REGION=us-east-1

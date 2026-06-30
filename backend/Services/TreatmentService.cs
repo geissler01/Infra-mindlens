@@ -44,7 +44,6 @@ public class TreatmentService : ITreatmentService
 
         return response;
     }
-
     public async Task<ServiceResponse<Treatment>> GetById(Guid id)
     {
         ServiceResponse<Treatment> response = new ServiceResponse<Treatment>();
@@ -119,7 +118,6 @@ public class TreatmentService : ITreatmentService
         
         return response;
     }
-
     public async Task<ServiceResponse> Update(Guid id, TreatmentUpdateDto request)
     {
         ServiceResponse response = new ServiceResponse();
@@ -178,6 +176,89 @@ public class TreatmentService : ITreatmentService
         // Returning response
         response.StatusCode = 200;
         response.Message = "Treatment Finished";
+        response.Success = true;
+        
+        return response;
+    }
+
+    // Treatment Questions
+    public async Task<ServiceResponse<ICollection<TreatmentQuestion>>> GetTreatmentQuestions(Guid treatmentId)
+    {
+        ServiceResponse<ICollection<TreatmentQuestion>> response = new ServiceResponse<ICollection<TreatmentQuestion>>();
+        
+        // Check treatment exists
+        var treatment = await _tenantContext.Treatments.Include(t => t .TreatmentQuestions).FirstOrDefaultAsync(t => t.Id == treatmentId);
+
+        if (treatment is null)
+        {
+            response.StatusCode = 404;
+            response.Message = "Treatment not found";
+            response.Success = false;
+            
+            return response;
+        }
+        
+        // Return response
+        response.StatusCode = 200;
+        response.Message = "Treatment questions found";
+        response.Success = true;
+        response.Data =  treatment.TreatmentQuestions;
+        
+        return response;
+    }
+    public async Task<ServiceResponse> AssignQuestion(Guid id, Guid questionId)
+    {
+        ServiceResponse response = new ServiceResponse();
+        
+        // Check the treatment exists
+        var treatment = await _tenantContext.Treatments.Include(t => t.TreatmentQuestions).FirstOrDefaultAsync(t => t.Id == id);
+
+        if (treatment is null)
+        {
+            response.StatusCode = 404;
+            response.Message = "Treatment not found";
+            response.Success = false;
+
+            return response;
+        }
+        
+        // Check the question exists
+        var question = await _tenantContext.Questions.FindAsync(questionId);
+
+        if (question is null)
+        {
+            response.StatusCode = 404;
+            response.Message = "Question not found";
+            response.Success = false;
+            
+            return response;
+        }
+        
+        // Check the patient hasn't this question assigned yet
+        if (treatment.TreatmentQuestions.Any(t => t.QuestionId == question.Id))
+        {
+            response.StatusCode = 409;
+            response.Message = "Question has already been assigned";
+            response.Success = false;
+            
+            return response;
+        }
+        
+        // Assign question to treatment
+        TreatmentQuestion newTreatmentQuestion = new TreatmentQuestion
+        {
+            QuestionId = question.Id,
+            TreatmentId = treatment.Id
+        };
+
+        await _tenantContext.TreatmentQuestions.AddAsync(newTreatmentQuestion);
+
+        // Save changes in db
+        await _tenantContext.SaveChangesAsync();
+
+        // Return response
+        response.StatusCode = 201;
+        response.Message = "Treatment question assigned successfully";
         response.Success = true;
         
         return response;

@@ -32,6 +32,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<ITreatmentService, TreatmentService>();
 builder.Services.AddScoped<IJournalingService, JournalingService>();
+builder.Services.AddScoped<IQuestionService, QuestionService>();
 
 // AWS Services Setup
 var awsEndpoint = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLens.Api.DTOs.Journaling;
@@ -87,17 +88,6 @@ public class JournalingController : ControllerBase
         // Returning response
         return StatusCode(response.StatusCode, response);
     }
-
-    [Authorize(Roles = nameof(UserRole.Patient))]
-    [HttpGet("/s3-key")]
-    public async Task<ActionResult<ServiceResponse>> GetS3Key([FromQuery] Guid patientId, [FromQuery] Guid treatmentId)
-    {
-        // Passing it to service
-        var response = await _journalingService.GetS3Key(patientId, treatmentId);
-
-        // Returning response
-        return StatusCode(response.StatusCode, response);
-    }
     
     [Authorize(Roles = nameof(UserRole.Patient))]
     [HttpPost]
@@ -117,6 +107,32 @@ public class JournalingController : ControllerBase
         // Passing it to service
         var response = await _journalingService.CreateAnswer(request);
 
+        // Returning response
+        return StatusCode(response.StatusCode, response);
+    }
+    
+    // Audio Management
+    [Authorize(Roles = nameof(UserRole.Patient))]
+    [HttpGet("/s3-key")]
+    public async Task<ActionResult<ServiceResponse>> GetS3Key()
+    {
+        // Identifying user
+        Guid userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        
+        // Passing it to service
+        var response = await _journalingService.GetS3Key(userId);
+
+        // Returning response
+        return StatusCode(response.StatusCode, response);
+    }
+
+    [Authorize(Roles = nameof(UserRole.Patient))]
+    [HttpGet("download-audio/{s3key:guid}")]
+    public async Task<ActionResult<ServiceResponse>> DownloadAudio(Guid s3key)
+    {
+        // Passing it to service
+        var response = await _journalingService.GetDownloadAudio(s3key.ToString());
+        
         // Returning response
         return StatusCode(response.StatusCode, response);
     }

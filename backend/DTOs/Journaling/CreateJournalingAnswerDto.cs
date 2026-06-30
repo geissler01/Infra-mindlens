@@ -15,6 +15,8 @@ public class CreateJournalingAnswerDto
     [EnumDataType(typeof(JournalingEntryType))]
     public JournalingEntryType EntryType { get; set; }
     
-    public string? VoiceRecordKey { get; set; } = string.Empty;
     public string? IdempotencyKey { get; set; } = string.Empty;
+    
+    [Required]
+    public string S3Key { get; set; } = string.Empty;
 }

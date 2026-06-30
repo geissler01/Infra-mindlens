@@ -5,6 +5,7 @@ using MindLens.Api.Responses;
 using MindLens.Api.Models;
 using MindLens.Api.DTOs.Journaling;
 using MindLens.Api.Filters;
+using MindLens.Api.Models.Enums;
 
 namespace MindLens.Api.Services;
 
@@ -48,7 +49,6 @@ public class JournalingService : IJournalingService
         
         return response;
     }
-
     public async Task<ServiceResponse<ICollection<JournalingAnswer>>> GetAnswers(JournalingAnswerFilters filters)
     {
         ServiceResponse<ICollection<JournalingAnswer>> response = new ServiceResponse<ICollection<JournalingAnswer>>();
@@ -73,7 +73,6 @@ public class JournalingService : IJournalingService
         
         return response;
     }
-
     public async Task<ServiceResponse<ICollection<JournalingRegisterResponseDto>>> GetRegisters(
         JournalingRegisterFilters filters)
     {
@@ -122,19 +121,6 @@ public class JournalingService : IJournalingService
             return response;
         }
         
-        // Generar URL prefirmada fresca de S3 si aplica
-        if (journaling.State == MindLens.Api.Models.Enums.JournalingState.Processed && !string.IsNullOrEmpty(journaling.VoiceRecordKey))
-        {
-            // Opcional: Generar link para el audio subido (si el cliente necesita escucharlo)
-            // No lo reasignamos al modelo para no ensuciarlo, pero si la UI lo espera, se puede hacer
-        }
-
-        if (journaling.State == MindLens.Api.Models.Enums.JournalingState.Processed && !string.IsNullOrEmpty(journaling.AiReplyKey))
-        {
-            // Entregar la URL temporal fresca para que descarguen el audio
-            journaling.AiReplyKey = _awsHelper.GenerateDownloadPresignedUrl(journaling.AiReplyKey);
-        }
-        
         // Returning response
         response.StatusCode = 200;
         response.Message = "Journaling Found!";
@@ -143,7 +129,6 @@ public class JournalingService : IJournalingService
         
         return response;
     }
-
     public async Task<ServiceResponse<JournalingAnswer>> GetAnswerById(Guid answerId)
     {
         ServiceResponse<JournalingAnswer> response = new ServiceResponse<JournalingAnswer>();
@@ -169,7 +154,6 @@ public class JournalingService : IJournalingService
         
         return response;
     }
-    
     public async Task<ServiceResponse<JournalingRegisterResponseDto>> GetRegisterById(Guid registerId) 
     {
         ServiceResponse<JournalingRegisterResponseDto> response = new ServiceResponse<JournalingRegisterResponseDto>();
@@ -201,22 +185,6 @@ public class JournalingService : IJournalingService
         response.Success = true;
         response.Data = journalingRegister;
         
-        return response;
-    }
-
-    public async Task<ServiceResponse<object>> GetS3Key(Guid patientId, Guid treatmentId)
-    {
-        ServiceResponse<object> response = new ServiceResponse<object>();
-        
-        var tenantId = _tenantService.CurrentTenant?.Id ?? Guid.Empty;
-        var (uploadUrl, s3Key) = _awsHelper.GenerateUploadPresignedUrl(tenantId, patientId, treatmentId);
-
-        // Return S3 Key
-        response.StatusCode = 200;
-        response.Message = "S3 Key Sent";
-        response.Success = true;
-        response.Data = new { uploadUrl, s3Key };
-
         return response;
     }
 
@@ -252,8 +220,7 @@ public class JournalingService : IJournalingService
         await _tenantContext.SaveChangesAsync();
         
         // Publish Event in Amazon Queue
-        var s3KeyToProcess = request.VoiceRecordKey ?? ""; // Deberia venir en el request si es voz
-        await _awsHelper.SendProcessingMessageAsync(newJournaling.Id, newJournaling.EntryType.ToString().ToLower(), s3KeyToProcess);
+        await _awsHelper.SendProcessingMessageAsync(newJournaling.Id, request.EntryType.ToString(), request.S3Key);
         
         // Returning response
         response.StatusCode = 201;
@@ -262,7 +229,6 @@ public class JournalingService : IJournalingService
         
         return response;
     }
-
     public async Task<ServiceResponse> CreateAnswer(CreateJournalingAnswerDto request)
     {
         ServiceResponse response = new ServiceResponse();
@@ -295,14 +261,87 @@ public class JournalingService : IJournalingService
         await _tenantContext.SaveChangesAsync();
         
         // Publish Event in Amazon Queue
-        var s3KeyToProcess = request.VoiceRecordKey ?? "";
-        await _awsHelper.SendProcessingMessageAsync(newJournalingAnswer.Id, newJournalingAnswer.EntryType.ToString().ToLower(), s3KeyToProcess);
+        await _awsHelper.SendProcessingMessageAsync(request.JournalingId, request.EntryType.ToString(), request.S3Key);
         
         // Returning response
         response.StatusCode = 201;
         response.Message = "Journaling Answer created with success";
         response.Success = true;
         
+        return response;
+    }
+    
+    // Audios Management
+    public async Task<ServiceResponse<JournalingUploadAudioResponse>> GetS3Key(Guid userId)
+    {
+        ServiceResponse<JournalingUploadAudioResponse> response = new ServiceResponse<JournalingUploadAudioResponse>();
+        
+        // Get Patient Id
+        Guid patientId = await _tenantContext.Patients
+            .Where(p => p.GlobalUserId == userId)
+            .Select(p => p.Id)
+            .FirstOrDefaultAsync();
+        
+        // Checking patient exists
+        if (patientId == Guid.Empty)
+        {
+            response.StatusCode = 404;
+            response.Message = "Patient Not Found";
+            response.Success = false;
+            
+            return response;
+        }
+        
+        // Get Tenant Id
+        Guid tenantId = _tenantService.CurrentTenant!.Id;
+
+        // Get Treatment Id
+        Guid treatmentId = await _tenantContext.Treatments
+            .Where(t => t.PatientId == patientId && t.State == TreatmentState.InProcess)
+            .Select(t => t.Id)
+            .FirstOrDefaultAsync();
+        
+        // Checking treatment exists
+        if (treatmentId == Guid.Empty)
+        {
+            response.StatusCode = 404;
+            response.Message = "Treatment Not Found";
+            response.Success = false;
+            
+            return response;
+        }
+        
+        // Generate S3 Url
+        var awsHelperResponse = _awsHelper.GenerateUploadPresignedUrl(tenantId, patientId, treatmentId);
+
+        // Return response
+        response.StatusCode = 200;
+        response.Success = true;
+        response.Message = "URL HTTP Put Successfully Generated";
+        response.Data = new JournalingUploadAudioResponse
+        {
+            UploadUrl = awsHelperResponse.uploadUrl,
+            S3Key = awsHelperResponse.s3Key
+        };
+
+        return response;
+    }
+    public async Task<ServiceResponse<JournalingDownloadAudioResponse>> GetDownloadAudio(string s3key)
+    {
+        ServiceResponse<JournalingDownloadAudioResponse> response = new ServiceResponse<JournalingDownloadAudioResponse>();
+        
+        // Calling service
+        var awsHelperResponse = _awsHelper.GenerateDownloadPresignedUrl(s3key); 
+        
+        // Returning response
+        response.StatusCode = 200;
+        response.Success = true;
+        response.Message = "Download Audio URL Generated";
+        response.Data = new JournalingDownloadAudioResponse
+        {
+            DownloadUrl = awsHelperResponse
+        };
+
         return response;
     }
 }

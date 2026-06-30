@@ -11,18 +11,20 @@ public class AwsHelper : IAwsHelper
 {
     private readonly IAmazonS3 _s3Client;
     private readonly IAmazonSQS _sqsClient;
-    private readonly string _bucketName = "journal-audios-bucket";
+    private readonly string _bucketName;
     private readonly string _queueUrl;
     private readonly bool _isLocal;
 
-    public AwsHelper(IAmazonS3 s3Client, IAmazonSQS sqsClient)
+    public AwsHelper(IAmazonS3 s3Client, IAmazonSQS sqsClient, IConfiguration configuration)
     {
         _s3Client = s3Client;
         _sqsClient = sqsClient;
-        _queueUrl = Environment.GetEnvironmentVariable("SQS_QUEUE_URL") ?? "";
-        _isLocal = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL"));
+        _queueUrl = configuration["AWS:QueueUrl"] ?? "";
+        _bucketName = configuration["AWS:AudioBucketName"] ?? "";
+        _isLocal = !string.IsNullOrEmpty(configuration["AWS:EndpointUrl"]);
     }
 
+    // Generating S3 Upload Audio Url
     public (string uploadUrl, string s3Key) GenerateUploadPresignedUrl(Guid tenantId, Guid patientId, Guid treatmentId)
     {
         var s3Key = $"audios/tenant_{tenantId}/patient_{patientId}/treatment_{treatmentId}/{Guid.NewGuid()}.m4a";
@@ -44,6 +46,7 @@ public class AwsHelper : IAwsHelper
         return (url, s3Key);
     }
 
+    // Generating Download Audio URL
     public string GenerateDownloadPresignedUrl(string s3Key)
     {
         var request = new GetPreSignedUrlRequest
@@ -64,6 +67,7 @@ public class AwsHelper : IAwsHelper
         return url;
     }
 
+    // Queue Publishing Event
     public async Task SendProcessingMessageAsync(Guid journalingId, string entryType, string s3Key)
     {
         if (string.IsNullOrEmpty(_queueUrl)) return;

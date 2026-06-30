@@ -15,8 +15,10 @@ public interface IJournalingService
     public Task<ServiceResponse<JournalingAnswer>> GetAnswerById(Guid answerId);
     public Task<ServiceResponse<JournalingRegisterResponseDto>> GetRegisterById(Guid registerId);
 
-    public Task<ServiceResponse<object>> GetS3Key(Guid patientId, Guid treatmentId);
-
     public Task<ServiceResponse> Create(CreateJournalingDto request);
     public Task<ServiceResponse> CreateAnswer(CreateJournalingAnswerDto request);
+    
+    // Audio Management
+    public Task<ServiceResponse<JournalingUploadAudioResponse>> GetS3Key(Guid patientId);
+    public Task<ServiceResponse<JournalingDownloadAudioResponse>> GetDownloadAudio(string s3key);
 }
