@@ -145,12 +145,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 
 var app = builder.Build();
 
-// Seeders
-using (var scope = app.Services.CreateScope())
-{
-    await RoleSeeder.SeedAsync(scope.ServiceProvider);
-    await MasterDataSeeder.SeedAsync(scope.ServiceProvider);
-}
+// Los seeders y migraciones ahora se ejecutan de manera aislada usando el microservicio MindLens.Migrator.
 
 // Global Exception Middleware
 app.UseMiddleware<ExceptionMiddleware>();

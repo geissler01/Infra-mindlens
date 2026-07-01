@@ -34,7 +34,7 @@ public class JournalingController : ControllerBase
     }
 
     [Authorize(Roles = nameof(UserRole.Psychologist))]
-    [HttpGet("/answers")]
+    [HttpGet("answers")]
     public async Task<ActionResult<ServiceResponse<ICollection<JournalingAnswer>>>> GetAnswers([FromQuery] JournalingAnswerFilters filters)
     {
         // Passing it to service
@@ -45,7 +45,7 @@ public class JournalingController : ControllerBase
     }
 
     [Authorize(Roles = nameof(UserRole.Psychologist))]
-    [HttpGet("/registers")]
+    [HttpGet("registers")]
     public async Task<ActionResult<ServiceResponse<ICollection<JournalingRegisterResponseDto>>>> GetRegisters(
         [FromQuery] JournalingRegisterFilters filters)
     {
@@ -68,7 +68,7 @@ public class JournalingController : ControllerBase
     }
 
     [Authorize(Roles = nameof(UserRole.Psychologist))]
-    [HttpGet("/answers/{answerId:guid}")]
+    [HttpGet("answers/{answerId:guid}")]
     public async Task<ActionResult<ServiceResponse<JournalingAnswer>>> GetAnswerById(Guid answerId)
     {
         // Passing it to service
@@ -79,7 +79,7 @@ public class JournalingController : ControllerBase
     }
 
     [Authorize(Roles = nameof(UserRole.Psychologist))]
-    [HttpGet("/registers/{registerId:guid}")]
+    [HttpGet("registers/{registerId:guid}")]
     public async Task<ActionResult<ServiceResponse<JournalingRegisterResponseDto>>> GetRegisterById(Guid registerId)
     {
         // Passing it to service
@@ -101,7 +101,7 @@ public class JournalingController : ControllerBase
     }
     
     [Authorize(Roles = nameof(UserRole.Patient))]
-    [HttpPost("/answers")]
+    [HttpPost("answers")]
     public async Task<ActionResult<ServiceResponse>> CreateAnswer(CreateJournalingAnswerDto request)
     {
         // Passing it to service
@@ -113,7 +113,7 @@ public class JournalingController : ControllerBase
     
     // Audio Management
     [Authorize(Roles = nameof(UserRole.Patient))]
-    [HttpGet("/s3-key")]
+    [HttpGet("s3-key")]
     public async Task<ActionResult<ServiceResponse>> GetS3Key()
     {
         // Identifying user

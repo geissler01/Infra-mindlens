@@ -2,7 +2,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict rahGfgX1SWzBh9CzaCJgNXRIEFhou72lnlibqqVNVHflFbcPodPrnfTeo1rtiO2
 
 -- Dumped from database version 15.18 (Debian 15.18-1.pgdg12+1)
 -- Dumped by pg_dump version 15.18 (Debian 15.18-1.pgdg12+1)
@@ -358,5 +357,4 @@ INSERT INTO "WeeklyClusterReports" ("Id", "WeeklyReportId", "Title", pillar_type
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rahGfgX1SWzBh9CzaCJgNXRIEFhou72lnlibqqVNVHflFbcPodPrnfTeo1rtiO2
 

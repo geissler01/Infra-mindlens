@@ -10,3 +10,9 @@ docker build -t poc-worker ../worker/
 docker tag poc-worker:latest 016963912697.dkr.ecr.us-east-2.amazonaws.com/poc-worker:latest
 Write-Output "Pushing Worker..."
 docker push 016963912697.dkr.ecr.us-east-2.amazonaws.com/poc-worker:latest
+
+Write-Output "Building Migrator..."
+docker build -t poc-migrator -f ../migrator/Dockerfile ../
+docker tag poc-migrator:latest 016963912697.dkr.ecr.us-east-2.amazonaws.com/poc-migrator:latest
+Write-Output "Pushing Migrator..."
+docker push 016963912697.dkr.ecr.us-east-2.amazonaws.com/poc-migrator:latest

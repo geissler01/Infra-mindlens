@@ -1,0 +1,36 @@
+{
+  "family": "poc-migrator-task",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "migrator",
+      "image": "016963912697.dkr.ecr.us-east-2.amazonaws.com/poc-migrator:latest",
+      "essential": true,
+      "environment": [
+        {"name": "MASTER_DB_HOST", "value": "journal-db-poc.cxeacy8aglmv.us-east-2.rds.amazonaws.com"},
+        {"name": "MASTER_DB_NAME", "value": "master_db"},
+        {"name": "MASTER_DB_USER", "value": "postgres"},
+        {"name": "TENANT_DB_HOST", "value": "journal-db-poc.cxeacy8aglmv.us-east-2.rds.amazonaws.com"},
+        {"name": "TENANT_DB_NAME", "value": "journal_db"},
+        {"name": "TENANT_DB_USER", "value": "postgres"}
+      ],
+      "secrets": [
+        {"name": "ConnectionStrings__SharedDB", "valueFrom": "arn:aws:ssm:us-east-2:016963912697:parameter/mindlens/prod/db_connection_string"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+            "awslogs-group": "/ecs/poc-migrator",
+            "awslogs-region": "us-east-2",
+            "awslogs-stream-prefix": "ecs",
+            "awslogs-create-group": "true"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::016963912697:role/ecsTaskExecutionRolePoc",
+  "taskRoleArn": "arn:aws:iam::016963912697:role/ecsTaskExecutionRolePoc"
+}

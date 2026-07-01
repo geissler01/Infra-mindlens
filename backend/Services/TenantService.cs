@@ -171,7 +171,7 @@ public class TenantService : ITenantService
 
             await using var commandExtension = tenantConnection.CreateCommand();
             commandExtension.CommandText = "CREATE EXTENSION IF NOT EXISTS vector";
-            await command.ExecuteNonQueryAsync();
+            await commandExtension.ExecuteNonQueryAsync();
         }
     }
     

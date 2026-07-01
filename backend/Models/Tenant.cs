@@ -10,5 +10,5 @@ public class Tenant
     public TenantState State { get; set; }
     public Guid PsychologistId { get; set; }
 
-    public User Psychologist { get; set; } = new User();
+    public User? Psychologist { get; set; }
 }

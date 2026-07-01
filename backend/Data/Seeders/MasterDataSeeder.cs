@@ -60,12 +60,16 @@ public class MasterDataSeeder
                     {
                         PsychologistId = newUser.Id,
                         DatabaseName = tenantData.DatabaseName,
-                        State = TenantState.Available,
+                        State = TenantState.Pending,
                         Domain = tenantData.DatabaseName.Replace("_db", ".mindlens.local")
                     };
                     context.Tenants.Add(tenant);
                     
                     await context.SaveChangesAsync();
+
+                    // Provision the physical DB
+                    var tenantService = serviceProvider.GetRequiredService<MindLens.Api.Services.Interfaces.ITenantService>();
+                    await tenantService.ProvideTenant(tenant.Id);
                 }
             }
         }
